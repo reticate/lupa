@@ -1,2 +1,4 @@
 # lupa
-kernel-shim loader for unsigned LSM bypass via initramfs tampering
+kernel-shim loader for unsigned LSM bypass via initramfs tampering for injecting a kernel shim into an initramfs image to bypass LSMs like SELinux and AppArmor. this shim hooks into critical kernel functions during early boot and disabling specific security mechanisms while avoiding kernel module verification
+
+by using the lack of integrity checks on the initramfs, this achieves an unsigned/persistent LSM bypass while requiring minimal changes to the system. it relies on `kallsyms_lookup_name` for dynamic symbol resolution. if `kallsyms_lookup_name` is unavailable you’ll need an alternative approach for locating kernel symbols. it also temporarily disables write protection by manipulating cr0 to allow kernel memory modifications while using `printk` macros in `logging.h` to debug kernel behavior for proper hook functionality
