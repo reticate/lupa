@@ -4,8 +4,7 @@
 #include <linux/types.h>
 
 uintptr_t find_kernel_symbol(const char *name);
-void clear_memory(void *addr, size_t size);
-void disable_write_protection(void);
-void enable_write_protection(void);
+uintptr_t get_kallsyms_lookup_name(void);
+uintptr_t scan_memory_for_pattern(uintptr_t base, size_t size, const char *pattern);
 
 #endif
