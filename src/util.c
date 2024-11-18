@@ -2,6 +2,7 @@
 #include "logging.h"
 #include <linux/workqueue.h>
 #include <linux/smp.h>
+#include <linux/version.h>
 
 struct scan_task {
     uintptr_t base;
@@ -59,17 +60,32 @@ uintptr_t scan_memory_for_pattern(uintptr_t base, size_t size, const char *patte
 }
 
 uintptr_t get_kallsyms_lookup_name(void) {
-    LOG_INFO("Locating kallsyms_lookup_name symbol using parallel scan.\n");
     uintptr_t base = 0xffffffff81000000;
     size_t scan_size = 0x200000;
     const char *pattern = "kallsyms_lookup_name";
     uintptr_t result = scan_memory_for_pattern(base, scan_size, pattern);
-
-    if (!result) {
-        LOG_WARN("kallsyms_lookup_name not found.\n");
-        return 0;
-    }
-
-    LOG_DEBUG("kallsyms_lookup_name found at address: %p\n", (void *)result);
+    if (!result) return 0;
     return result;
+}
+
+uintptr_t get_selinux_ops(void) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+    return find_kernel_symbol("security_hook_heads");
+#else
+    return find_kernel_symbol("selinux_ops");
+#endif
+}
+
+uintptr_t get_apparmor_ops(void) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+    return find_kernel_symbol("lsm_hook_heads");
+#else
+    return find_kernel_symbol("apparmor_ops");
+#endif
+}
+
+uintptr_t find_kernel_symbol(const char *name) {
+    uintptr_t kallsyms_lookup = get_kallsyms_lookup_name();
+    if (!kallsyms_lookup) return 0;
+    return ((uintptr_t (*)(const char *))kallsyms_lookup)(name);
 }
