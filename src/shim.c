@@ -6,6 +6,9 @@
 
 #define MAX_HOOKS 10
 static const char *hook_targets[MAX_HOOKS];
+static uintptr_t original_hooks[MAX_HOOKS];
+static uintptr_t original_selinux_ops;
+static uintptr_t original_apparmor_ops;
 static int hook_count = 0;
 
 void load_hooks_from_file(const char *path) {
@@ -29,7 +32,11 @@ void load_hooks_from_file(const char *path) {
         char *newline;
 
         while ((newline = strsep(&line, "\n")) != NULL && hook_count < MAX_HOOKS) {
-            if (*newline) hook_targets[hook_count++] = kstrdup(newline, GFP_KERNEL);
+            if (*newline) {
+                hook_targets[hook_count] = kstrdup(newline, GFP_KERNEL);
+                original_hooks[hook_count] = find_kernel_symbol(hook_targets[hook_count]);
+                hook_count++;
+            }
         }
         offset = 0;
     }
@@ -41,11 +48,39 @@ void disable_lsm_hooks(void) {
     uintptr_t selinux_addr = get_selinux_ops();
     uintptr_t apparmor_addr = get_apparmor_ops();
 
-    if (selinux_addr) *(uintptr_t *)selinux_addr = 0;
-    if (apparmor_addr) *(uintptr_t *)apparmor_addr = 0;
+    if (selinux_addr) {
+        original_selinux_ops = *(uintptr_t *)selinux_addr;
+        *(uintptr_t *)selinux_addr = 0;
+    }
+    if (apparmor_addr) {
+        original_apparmor_ops = *(uintptr_t *)apparmor_addr;
+        *(uintptr_t *)apparmor_addr = 0;
+    }
 
     for (int i = 0; i < hook_count; i++) {
         uintptr_t hook_addr = find_kernel_symbol(hook_targets[i]);
-        if (hook_addr) *(uintptr_t *)hook_addr = 0;
+        if (hook_addr) {
+            original_hooks[i] = *(uintptr_t *)hook_addr;
+            *(uintptr_t *)hook_addr = 0;
+        }
+    }
+}
+
+void restore_lsm_hooks(void) {
+    uintptr_t selinux_addr = get_selinux_ops();
+    uintptr_t apparmor_addr = get_apparmor_ops();
+
+    if (selinux_addr && original_selinux_ops) {
+        *(uintptr_t *)selinux_addr = original_selinux_ops;
+    }
+    if (apparmor_addr && original_apparmor_ops) {
+        *(uintptr_t *)apparmor_addr = original_apparmor_ops;
+    }
+
+    for (int i = 0; i < hook_count; i++) {
+        uintptr_t hook_addr = find_kernel_symbol(hook_targets[i]);
+        if (hook_addr && original_hooks[i]) {
+            *(uintptr_t *)hook_addr = original_hooks[i];
+        }
     }
 }

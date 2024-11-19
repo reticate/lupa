@@ -5,6 +5,6 @@
 
 void hook_kernel(void);
 void disable_lsm_hooks(void);
-void add_kernel_hook(const char *hook_name);
+void restore_lsm_hooks(void);
 
 #endif
